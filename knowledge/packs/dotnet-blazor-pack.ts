@@ -1,4 +1,4 @@
-[
+export default [
   {
     "id": "blazor-server-signalr-configuration",
     "category": "dockerfile",
@@ -493,4 +493,4 @@
     ],
     "description": "Proper asset optimization significantly improves Blazor WASM loading performance"
   }
-]
+] as const;

@@ -1,4 +1,4 @@
-[
+export default [
   {
     "id": "signalr-standalone-service",
     "category": "dockerfile",
@@ -258,4 +258,4 @@
     ],
     "description": "Circuit breaker pattern protects SignalR services from external service failures"
   }
-]
+] as const;
