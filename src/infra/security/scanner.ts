@@ -2,6 +2,8 @@ import type { Logger } from 'pino';
 import { Result, Success, Failure } from '@/types';
 import { extractErrorMessage } from '@/lib/errors';
 import { scanImageWithTrivy, checkTrivyAvailability } from './trivy-scanner';
+import { scanImageWithSnyk, checkSnykAvailability } from './snyk-scanner';
+import { scanImageWithGrype, checkGrypeAvailability } from './grype-scanner';
 
 interface SecurityScanner {
   scanImage: (imageId: string) => Promise<Result<BasicScanResult>>;
@@ -41,6 +43,46 @@ function createTrivyScanner(logger: Logger): SecurityScanner {
       const result = await checkTrivyAvailability(logger);
       if (result.ok) {
         logger.debug({ version: result.value }, 'Trivy scanner available');
+        return Success(true);
+      }
+      return Failure(result.error, result.guidance);
+    },
+  };
+}
+
+/**
+ * Create a Snyk-based security scanner
+ */
+function createSnykScanner(logger: Logger): SecurityScanner {
+  return {
+    async scanImage(imageId: string): Promise<Result<BasicScanResult>> {
+      return scanImageWithSnyk(imageId, logger);
+    },
+
+    async ping(): Promise<Result<boolean>> {
+      const result = await checkSnykAvailability(logger);
+      if (result.ok) {
+        logger.debug({ version: result.value }, 'Snyk scanner available');
+        return Success(true);
+      }
+      return Failure(result.error, result.guidance);
+    },
+  };
+}
+
+/**
+ * Create a Grype-based security scanner
+ */
+function createGrypeScanner(logger: Logger): SecurityScanner {
+  return {
+    async scanImage(imageId: string): Promise<Result<BasicScanResult>> {
+      return scanImageWithGrype(imageId, logger);
+    },
+
+    async ping(): Promise<Result<boolean>> {
+      const result = await checkGrypeAvailability(logger);
+      if (result.ok) {
+        logger.debug({ version: result.value }, 'Grype scanner available');
         return Success(true);
       }
       return Failure(result.error, result.guidance);
@@ -96,7 +138,7 @@ function createStubScanner(logger: Logger): SecurityScanner {
  * Create a security scanner based on the specified type
  *
  * @param logger - Logger instance
- * @param scannerType - Type of scanner to create ('trivy', 'stub', or undefined for 'trivy')
+ * @param scannerType - Type of scanner to create ('trivy', 'snyk', 'grype', 'stub', or undefined for 'trivy')
  * @returns SecurityScanner instance
  */
 export const createSecurityScanner = (logger: Logger, scannerType?: string): SecurityScanner => {
@@ -105,6 +147,10 @@ export const createSecurityScanner = (logger: Logger, scannerType?: string): Sec
   switch (type) {
     case 'trivy':
       return createTrivyScanner(logger);
+    case 'snyk':
+      return createSnykScanner(logger);
+    case 'grype':
+      return createGrypeScanner(logger);
     case 'stub':
       return createStubScanner(logger);
     default:
