@@ -1,6 +1,6 @@
 /**
  * Common Scanner Utilities
- * 
+ *
  * Shared functionality across security scanner implementations
  * to reduce code duplication and centralize security-critical logic.
  */
@@ -83,7 +83,15 @@ export class SeverityCounter {
     return this.critical + this.high + this.medium + this.low + this.negligible + this.unknown;
   }
 
-  getCounts() {
+  getCounts(): {
+    criticalCount: number;
+    highCount: number;
+    mediumCount: number;
+    lowCount: number;
+    negligibleCount: number;
+    unknownCount: number;
+    totalVulnerabilities: number;
+  } {
     return {
       criticalCount: this.critical,
       highCount: this.high,
@@ -101,7 +109,7 @@ export class SeverityCounter {
  */
 export function parseVersion(output: string, pattern: RegExp): string | undefined {
   const match = output.match(pattern);
-  return match && match[1] ? match[1].trim() : undefined;
+  return match?.[1]?.trim();
 }
 
 /**

@@ -92,16 +92,28 @@ function parseSnykOutput(snykOutput: SnykOutput, imageId: string): BasicScanResu
  * Get Snyk version
  * @throws Error if Snyk is not installed or execution fails
  */
-async function getSnykVersion(logger: Logger): Promise<string | undefined> {
+async function getSnykVersion(logger: Logger): Promise<Result<string>> {
   try {
     const { stdout } = await execFileAsync('snyk', ['--version'], { timeout: 5000 });
     // Snyk version output format: just the version number (e.g., "1.1230.0")
-    return stdout.trim();
+    const version = stdout.trim();
+    if (!version) {
+      return Failure('Snyk version could not be parsed', {
+        message: 'Snyk version check failed',
+        hint: 'Snyk CLI may not be properly configured',
+        resolution: 'Try running: snyk --version',
+      });
+    }
+    return Success(version);
   } catch (error: unknown) {
     const err = error as NodeJS.ErrnoException;
     if (err?.code === 'ETIMEDOUT') {
       logger.error({ error }, 'Snyk version check timed out');
-      return undefined;
+      return Failure('Snyk version check timed out', {
+        message: 'Command execution timeout',
+        hint: 'Snyk CLI took too long to respond',
+        resolution: 'Check if Snyk is functioning correctly: snyk --version',
+      });
     }
     throw error;
   }
@@ -112,15 +124,11 @@ async function getSnykVersion(logger: Logger): Promise<string | undefined> {
  */
 export async function checkSnykAvailability(logger: Logger): Promise<Result<string>> {
   try {
-    const version = await getSnykVersion(logger);
-    if (!version) {
-      return Failure('Snyk is installed but version could not be determined', {
-        message: 'Snyk version check failed',
-        hint: 'Snyk CLI may not be properly configured',
-        resolution: 'Try running: snyk --version',
-      });
+    const versionResult = await getSnykVersion(logger);
+    if (!versionResult.ok) {
+      return versionResult;
     }
-    return Success(version);
+    return Success(versionResult.value);
   } catch (error) {
     return Failure('Snyk not installed or not in PATH', {
       message: 'Snyk CLI not found',
@@ -210,6 +218,15 @@ export async function scanImageWithSnyk(
       logger.debug({ stderr }, 'Snyk stderr output');
     }
 
+    // Validate output size before parsing
+    if (stdout.length === 0) {
+      return Failure('Snyk returned empty output', {
+        message: 'No scan results received',
+        hint: 'Snyk may not have found the image or encountered an error',
+        resolution: `Verify image exists: docker image inspect ${imageId}`,
+      });
+    }
+
     // Parse JSON output
     let snykOutput: SnykOutput;
     try {
@@ -250,9 +267,13 @@ export async function scanImageWithSnyk(
     return Success(scanResult);
   } catch (error) {
     // When Snyk exits with non-zero code, try to parse stdout for error details
-    if (error && typeof error === 'object' && 'stdout' in error) {
-      const stdout = String((error as { stdout?: string | Buffer }).stdout || '').trim();
-      
+    const hasStdout = (err: unknown): err is { stdout: string | Buffer } => {
+      return typeof err === 'object' && err !== null && 'stdout' in err;
+    };
+
+    if (hasStdout(error)) {
+      const stdout = String(error.stdout || '').trim();
+
       if (stdout) {
         try {
           const snykOutput = JSON.parse(stdout) as SnykOutput;

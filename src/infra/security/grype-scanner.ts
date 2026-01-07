@@ -126,7 +126,7 @@ function parseGrypeOutput(grypeOutput: GrypeOutput, imageId: string): BasicScanR
     // Add fixedVersion if available (from fix.versions array)
     if (vuln.fix?.versions && vuln.fix.versions.length > 0 && vuln.fix.state === 'fixed') {
       const fixedVersion = vuln.fix.versions[0];
-      if (fixedVersion !== undefined) {
+      if (fixedVersion) {
         vulnEntry.fixedVersion = fixedVersion;
       }
     }
@@ -146,20 +146,29 @@ function parseGrypeOutput(grypeOutput: GrypeOutput, imageId: string): BasicScanR
  * Get Grype version
  * @throws Error if Grype is not installed or execution fails
  */
-async function getGrypeVersion(logger: Logger): Promise<string | undefined> {
+async function getGrypeVersion(logger: Logger): Promise<Result<string>> {
   try {
     const { stdout } = await execFileAsync('grype', ['version'], { timeout: 5000 });
     // Grype version output format: multi-line with "Version: X.Y.Z"
     const version = parseVersion(stdout, /Version:\s*([^\s\n]+)/);
     if (!version) {
       logger.debug({ stdout }, 'Could not parse Grype version from output');
+      return Failure('Grype version could not be parsed', {
+        message: 'Grype version check failed',
+        hint: 'Grype CLI may not be properly configured',
+        resolution: 'Try running: grype version',
+      });
     }
-    return version;
+    return Success(version);
   } catch (error: unknown) {
     const err = error as NodeJS.ErrnoException;
     if (err?.code === 'ETIMEDOUT') {
       logger.error({ error }, 'Grype version check timed out');
-      return undefined;
+      return Failure('Grype version check timed out', {
+        message: 'Command execution timeout',
+        hint: 'Grype CLI took too long to respond',
+        resolution: 'Check if Grype is functioning correctly: grype version',
+      });
     }
     throw error;
   }
@@ -170,15 +179,11 @@ async function getGrypeVersion(logger: Logger): Promise<string | undefined> {
  */
 export async function checkGrypeAvailability(logger: Logger): Promise<Result<string>> {
   try {
-    const version = await getGrypeVersion(logger);
-    if (!version) {
-      return Failure('Grype is installed but version could not be determined', {
-        message: 'Grype version check failed',
-        hint: 'Grype CLI may not be properly configured',
-        resolution: 'Try running: grype version',
-      });
+    const versionResult = await getGrypeVersion(logger);
+    if (!versionResult.ok) {
+      return versionResult;
     }
-    return Success(version);
+    return Success(versionResult.value);
   } catch (error) {
     return Failure('Grype not installed or not in PATH', {
       message: 'Grype CLI not found',
@@ -230,6 +235,15 @@ export async function scanImageWithGrype(
     // Log any warnings from stderr
     if (stderr) {
       logger.debug({ stderr }, 'Grype stderr output');
+    }
+
+    // Validate output size before parsing
+    if (stdout.length === 0) {
+      return Failure('Grype returned empty output', {
+        message: 'No scan results received',
+        hint: 'Grype may not have found the image or encountered an error',
+        resolution: `Verify image exists: docker image inspect ${imageId}`,
+      });
     }
 
     // Parse JSON output
