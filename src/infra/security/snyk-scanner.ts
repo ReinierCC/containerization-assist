@@ -21,6 +21,7 @@ import {
   normalizeSeverity,
   logScanStart,
   logScanComplete,
+  ScannerErrors,
 } from './scanner-common';
 
 const execFileAsync = promisify(execFile);
@@ -98,22 +99,14 @@ async function getSnykVersion(logger: Logger): Promise<Result<string>> {
     // Snyk version output format: just the version number (e.g., "1.1230.0")
     const version = stdout.trim();
     if (!version) {
-      return Failure('Snyk version could not be parsed', {
-        message: 'Snyk version check failed',
-        hint: 'Snyk CLI may not be properly configured',
-        resolution: 'Try running: snyk --version',
-      });
+      return ScannerErrors.versionParseError('Snyk', 'snyk --version');
     }
     return Success(version);
   } catch (error: unknown) {
     const err = error as NodeJS.ErrnoException;
     if (err?.code === 'ETIMEDOUT') {
       logger.error({ error }, 'Snyk version check timed out');
-      return Failure('Snyk version check timed out', {
-        message: 'Command execution timeout',
-        hint: 'Snyk CLI took too long to respond',
-        resolution: 'Check if Snyk is functioning correctly: snyk --version',
-      });
+      return ScannerErrors.versionCheckTimeout('Snyk', 'snyk --version');
     }
     throw error;
   }
@@ -129,14 +122,11 @@ export async function checkSnykAvailability(logger: Logger): Promise<Result<stri
       return versionResult;
     }
     return Success(versionResult.value);
-  } catch (error) {
-    return Failure('Snyk not installed or not in PATH', {
-      message: 'Snyk CLI not found',
-      hint: 'Snyk CLI is required for security scanning',
-      resolution:
-        'Install Snyk: npm install -g snyk or download from https://docs.snyk.io/snyk-cli/install-the-snyk-cli',
-      details: { error: extractErrorMessage(error) },
-    });
+  } catch {
+    return ScannerErrors.scannerNotInstalled(
+      'Snyk',
+      'npm install -g snyk or https://docs.snyk.io/snyk-cli/install-the-snyk-cli',
+    );
   }
 }
 
@@ -174,12 +164,7 @@ export async function scanImageWithSnyk(
 ): Promise<Result<BasicScanResult>> {
   // Validate imageId to prevent command injection
   if (!validateImageId(imageId)) {
-    return Failure('Invalid imageId format', {
-      message: 'ImageId contains invalid characters',
-      hint: 'ImageId must contain only alphanumeric characters, dots, colons, slashes, at-signs, underscores, and hyphens',
-      resolution: 'Verify the imageId is a valid Docker image identifier',
-      details: { imageId },
-    });
+    return ScannerErrors.invalidImageId(imageId);
   }
 
   // Check if Snyk is available
@@ -220,11 +205,7 @@ export async function scanImageWithSnyk(
 
     // Validate output size before parsing
     if (stdout.length === 0) {
-      return Failure('Snyk returned empty output', {
-        message: 'No scan results received',
-        hint: 'Snyk may not have found the image or encountered an error',
-        resolution: `Verify image exists: docker image inspect ${imageId}`,
-      });
+      return ScannerErrors.emptyOutput('Snyk', imageId);
     }
 
     // Parse JSON output
@@ -232,15 +213,11 @@ export async function scanImageWithSnyk(
     try {
       snykOutput = JSON.parse(stdout);
     } catch (parseError) {
-      return Failure('Failed to parse Snyk output', {
-        message: 'Snyk output parsing failed',
-        hint: 'Snyk may have returned invalid JSON',
-        resolution: `Try running Snyk manually to verify: snyk container test ${imageId} --json`,
-        details: {
-          parseError: extractErrorMessage(parseError),
-          outputPreview: stdout.substring(0, 200),
-        },
-      });
+      return ScannerErrors.jsonParseError(
+        'Snyk',
+        extractErrorMessage(parseError),
+        stdout.substring(0, 200),
+      );
     }
 
     // Check for errors in the output
@@ -302,12 +279,6 @@ export async function scanImageWithSnyk(
     // Generic error handling
     const errorMessage = extractErrorMessage(error);
     logger.error({ error: errorMessage, imageId }, 'Snyk scan failed');
-
-    return Failure(`Snyk scan failed: ${errorMessage}`, {
-      message: 'Security scan execution failed',
-      hint: 'Snyk encountered an error while scanning the image',
-      resolution: `Check image exists and is accessible: docker image ls | grep ${imageId}`,
-      details: { error: errorMessage },
-    });
+    return ScannerErrors.scanExecutionError('Snyk', imageId, errorMessage);
   }
 }

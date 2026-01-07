@@ -6,6 +6,88 @@
  */
 
 import type { Logger } from 'pino';
+import { Failure, type Result } from '@/types';
+
+/**
+ * Common error messages and guidance for scanner implementations
+ */
+export const ScannerErrors = {
+  /**
+   * Create invalid imageId error
+   */
+  invalidImageId: (imageId: string): Result<never> =>
+    Failure('Invalid imageId format', {
+      message: 'ImageId contains invalid characters',
+      hint: 'ImageId must contain only alphanumeric characters, dots, colons, slashes, at-signs, underscores, and hyphens',
+      resolution: 'Verify the imageId is a valid Docker image identifier',
+      details: { imageId },
+    }),
+
+  /**
+   * Create scanner not installed error
+   */
+  scannerNotInstalled: (scannerName: string, installUrl: string): Result<never> =>
+    Failure(`${scannerName} not installed or not in PATH`, {
+      message: `${scannerName} CLI not found`,
+      hint: `${scannerName} CLI is required for security scanning`,
+      resolution: `Install ${scannerName}: ${installUrl}`,
+    }),
+
+  /**
+   * Create JSON parse error
+   */
+  jsonParseError: (scannerName: string, parseError: string, outputPreview: string): Result<never> =>
+    Failure(`Failed to parse ${scannerName} output`, {
+      message: `${scannerName} output parsing failed`,
+      hint: `${scannerName} may have returned invalid JSON`,
+      resolution: `Try running ${scannerName} manually to verify`,
+      details: {
+        parseError,
+        outputPreview,
+      },
+    }),
+
+  /**
+   * Create empty output error
+   */
+  emptyOutput: (scannerName: string, imageId: string): Result<never> =>
+    Failure(`${scannerName} returned empty output`, {
+      message: 'No scan results received',
+      hint: `${scannerName} may not have found the image or encountered an error`,
+      resolution: `Verify image exists: docker image inspect ${imageId}`,
+    }),
+
+  /**
+   * Create scan execution error
+   */
+  scanExecutionError: (scannerName: string, imageId: string, errorMessage: string): Result<never> =>
+    Failure(`${scannerName} scan failed: ${errorMessage}`, {
+      message: 'Security scan execution failed',
+      hint: `${scannerName} encountered an error while scanning the image`,
+      resolution: `Check image exists and is accessible: docker image ls | grep ${imageId}`,
+      details: { error: errorMessage },
+    }),
+
+  /**
+   * Create version check timeout error
+   */
+  versionCheckTimeout: (scannerName: string, command: string): Result<never> =>
+    Failure(`${scannerName} version check timed out`, {
+      message: 'Command execution timeout',
+      hint: `${scannerName} CLI took too long to respond`,
+      resolution: `Check if ${scannerName} is functioning correctly: ${command}`,
+    }),
+
+  /**
+   * Create version parse error
+   */
+  versionParseError: (scannerName: string, command: string): Result<never> =>
+    Failure(`${scannerName} version could not be parsed`, {
+      message: `${scannerName} version check failed`,
+      hint: `${scannerName} CLI may not be properly configured`,
+      resolution: `Try running: ${command}`,
+    }),
+};
 
 /**
  * Validate imageId against allowlist pattern to prevent command injection

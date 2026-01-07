@@ -22,6 +22,7 @@ import {
   parseVersion,
   logScanStart,
   logScanComplete,
+  ScannerErrors,
 } from './scanner-common';
 
 const execFileAsync = promisify(execFile);
@@ -153,22 +154,14 @@ async function getGrypeVersion(logger: Logger): Promise<Result<string>> {
     const version = parseVersion(stdout, /Version:\s*([^\s\n]+)/);
     if (!version) {
       logger.debug({ stdout }, 'Could not parse Grype version from output');
-      return Failure('Grype version could not be parsed', {
-        message: 'Grype version check failed',
-        hint: 'Grype CLI may not be properly configured',
-        resolution: 'Try running: grype version',
-      });
+      return ScannerErrors.versionParseError('Grype', 'grype version');
     }
     return Success(version);
   } catch (error: unknown) {
     const err = error as NodeJS.ErrnoException;
     if (err?.code === 'ETIMEDOUT') {
       logger.error({ error }, 'Grype version check timed out');
-      return Failure('Grype version check timed out', {
-        message: 'Command execution timeout',
-        hint: 'Grype CLI took too long to respond',
-        resolution: 'Check if Grype is functioning correctly: grype version',
-      });
+      return ScannerErrors.versionCheckTimeout('Grype', 'grype version');
     }
     throw error;
   }
@@ -184,14 +177,11 @@ export async function checkGrypeAvailability(logger: Logger): Promise<Result<str
       return versionResult;
     }
     return Success(versionResult.value);
-  } catch (error) {
-    return Failure('Grype not installed or not in PATH', {
-      message: 'Grype CLI not found',
-      hint: 'Grype CLI is required for security scanning',
-      resolution:
-        'Install Grype: brew install grype or download from https://github.com/anchore/grype#installation',
-      details: { error: extractErrorMessage(error) },
-    });
+  } catch {
+    return ScannerErrors.scannerNotInstalled(
+      'Grype',
+      'brew install grype or https://github.com/anchore/grype#installation',
+    );
   }
 }
 
@@ -204,12 +194,7 @@ export async function scanImageWithGrype(
 ): Promise<Result<BasicScanResult>> {
   // Validate imageId to prevent command injection
   if (!validateImageId(imageId)) {
-    return Failure('Invalid imageId format', {
-      message: 'ImageId contains invalid characters',
-      hint: 'ImageId must contain only alphanumeric characters, dots, colons, slashes, at-signs, underscores, and hyphens',
-      resolution: 'Verify the imageId is a valid Docker image identifier',
-      details: { imageId },
-    });
+    return ScannerErrors.invalidImageId(imageId);
   }
 
   // Check if Grype is available
@@ -239,11 +224,7 @@ export async function scanImageWithGrype(
 
     // Validate output size before parsing
     if (stdout.length === 0) {
-      return Failure('Grype returned empty output', {
-        message: 'No scan results received',
-        hint: 'Grype may not have found the image or encountered an error',
-        resolution: `Verify image exists: docker image inspect ${imageId}`,
-      });
+      return ScannerErrors.emptyOutput('Grype', imageId);
     }
 
     // Parse JSON output
@@ -251,15 +232,11 @@ export async function scanImageWithGrype(
     try {
       grypeOutput = JSON.parse(stdout);
     } catch (parseError) {
-      return Failure('Failed to parse Grype output', {
-        message: 'Grype output parsing failed',
-        hint: 'Grype may have returned invalid JSON',
-        resolution: `Try running Grype manually to verify: grype ${imageId} -o json`,
-        details: {
-          parseError: extractErrorMessage(parseError),
-          outputPreview: stdout.substring(0, 200),
-        },
-      });
+      return ScannerErrors.jsonParseError(
+        'Grype',
+        extractErrorMessage(parseError),
+        stdout.substring(0, 200),
+      );
     }
 
     // Parse the Grype output into our format
@@ -278,12 +255,6 @@ export async function scanImageWithGrype(
   } catch (error) {
     const errorMessage = extractErrorMessage(error);
     logger.error({ error: errorMessage, imageId }, 'Grype scan failed');
-
-    return Failure(`Grype scan failed: ${errorMessage}`, {
-      message: 'Security scan execution failed',
-      hint: 'Grype encountered an error while scanning the image',
-      resolution: `Check image exists and is accessible: docker image ls | grep ${imageId}`,
-      details: { error: errorMessage },
-    });
+    return ScannerErrors.scanExecutionError('Grype', imageId, errorMessage);
   }
 }
