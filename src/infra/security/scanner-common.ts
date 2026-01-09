@@ -9,6 +9,22 @@ import type { Logger } from 'pino';
 import { Failure, type Result } from '@/types';
 
 /**
+ * Safely quote a value for use in shell commands
+ * Uses POSIX single-quote escaping: wraps in '' and escapes internal quotes as '\''
+ * This is the standard approach used by shell-quote and similar libraries
+ * 
+ * @example
+ * shellQuote("hello") => "'hello'"
+ * shellQuote("it's") => "'it'\\''s'"
+ * shellQuote("a;rm -rf /") => "'a;rm -rf /'"
+ */
+function shellQuote(value: string): string {
+  // POSIX single-quote escaping: replace ' with '\''
+  // This closes the quote, adds escaped quote, then reopens quote
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+/**
  * Common error messages and guidance for scanner implementations
  */
 export const ScannerErrors = {
@@ -54,7 +70,7 @@ export const ScannerErrors = {
     Failure(`${scannerName} returned empty output`, {
       message: 'No scan results received',
       hint: `${scannerName} may not have found the image or encountered an error`,
-      resolution: `Verify image exists: docker image inspect ${imageId}`,
+      resolution: `Verify image exists: docker image inspect ${shellQuote(imageId)}`,
     }),
 
   /**
@@ -64,7 +80,7 @@ export const ScannerErrors = {
     Failure(`${scannerName} scan failed: ${errorMessage}`, {
       message: 'Security scan execution failed',
       hint: `${scannerName} encountered an error while scanning the image`,
-      resolution: `Check image exists and is accessible: docker image ls | grep ${imageId}`,
+      resolution: `Check image exists and is accessible: docker image ls | grep ${shellQuote(imageId)}`,
       details: { error: errorMessage },
     }),
 
