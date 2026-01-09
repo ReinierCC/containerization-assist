@@ -729,7 +729,7 @@ describe('Scanner Common Utilities', () => {
         expect(result.ok).toBe(false);
         if (!result.ok) {
           expect(result.error).toContain('Grype returned empty output');
-          expect(result.guidance?.resolution).toContain('docker image inspect nginx:latest');
+          expect(result.guidance?.resolution).toContain("docker image inspect 'nginx:latest'");
         }
       });
     });
@@ -742,7 +742,7 @@ describe('Scanner Common Utilities', () => {
         if (!result.ok) {
           expect(result.error).toContain('Trivy scan failed: Connection timeout');
           expect(result.guidance?.details).toEqual({ error: 'Connection timeout' });
-          expect(result.guidance?.resolution).toContain('docker image ls');
+          expect(result.guidance?.resolution).toContain("docker image ls | grep 'nginx:latest'");
         }
       });
     });
