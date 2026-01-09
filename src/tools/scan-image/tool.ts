@@ -47,6 +47,7 @@ export interface ScanImageResult {
    */
   summary?: string;
   success: boolean;
+  scanner: string;
   remediationGuidance?: Array<{
     vulnerability: string;
     recommendation: string;
@@ -225,14 +226,15 @@ async function handleScanImage(
 
     const summary = buildStatusSummary(
       passed,
-      `🔒 Security scan passed. ${vulnSummary}.${remediationText}`,
-      `🔒 Security scan failed. ${vulnSummary}.${remediationText}`,
+      `🔒 Security scan passed (${scanner}). ${vulnSummary}.${remediationText}`,
+      `🔒 Security scan failed (${scanner}). ${vulnSummary}.${remediationText}`,
     );
 
     // Prepare the result
     const result: ScanImageResult = {
       summary,
       success: true,
+      scanner,
       ...(remediationGuidance.length > 0 && { remediationGuidance }),
       vulnerabilities: {
         critical: scanResult.criticalCount,
