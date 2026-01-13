@@ -151,27 +151,28 @@ const TEST_CASES: TestCase[] = [
     expectedViolations: ['avoid-apt-upgrade'],
     category: 'warning',
   },
+  // Additional warning tests
   {
-    name: 'Alpine Variant - Pass',
-    file: 'happy/alpine-variant.Dockerfile',
+    name: 'Alpine Images - Pass',
+    file: 'happy/alpine-image.Dockerfile',
     expectedResult: 'pass',
     category: 'warning',
   },
   {
-    name: 'Alpine Variant - Warn',
-    file: 'sad/non-alpine-variant.Dockerfile',
+    name: 'Alpine Images - Warn',
+    file: 'sad/non-alpine-image.Dockerfile',
     expectedResult: 'warn',
     expectedViolations: ['recommend-alpine'],
     category: 'warning',
   },
   {
-    name: 'Base Image Size - Pass',
-    file: 'happy/appropriate-size.Dockerfile',
+    name: 'Oversized Base - Pass',
+    file: 'happy/small-base-image.Dockerfile',
     expectedResult: 'pass',
     category: 'warning',
   },
   {
-    name: 'Base Image Size - Warn',
+    name: 'Oversized Base - Warn',
     file: 'sad/oversized-base.Dockerfile',
     expectedResult: 'warn',
     expectedViolations: ['block-oversized-base'],
@@ -191,23 +192,49 @@ const TEST_CASES: TestCase[] = [
     category: 'warning',
   },
   {
-    name: 'Sudo Usage - Pass',
+    name: 'Sudo - Pass',
     file: 'happy/no-sudo.Dockerfile',
     expectedResult: 'pass',
     category: 'warning',
   },
   {
-    name: 'Sudo Usage - Warn',
+    name: 'Sudo - Warn',
     file: 'sad/with-sudo.Dockerfile',
     expectedResult: 'warn',
     expectedViolations: ['avoid-sudo'],
     category: 'warning',
   },
+  // Additional blocking tests
+  {
+    name: 'Privileged Mode - Pass',
+    file: 'happy/no-privileged.Dockerfile',
+    expectedResult: 'pass',
+    category: 'blocking',
+  },
+  {
+    name: 'Privileged Mode - Fail',
+    file: 'sad/with-privileged.Dockerfile',
+    expectedResult: 'fail',
+    expectedViolations: ['block-privileged'],
+    category: 'blocking',
+  },
+  {
+    name: 'Host Network - Pass',
+    file: 'happy/no-host-network.Dockerfile',
+    expectedResult: 'pass',
+    category: 'blocking',
+  },
+  {
+    name: 'Host Network - Fail',
+    file: 'sad/with-host-network.Dockerfile',
+    expectedResult: 'fail',
+    expectedViolations: ['block-host-network'],
+    category: 'blocking',
+  },
 ];
 
 /**
  * Extract all rule IDs from Rego policy files
- * Filters out Kubernetes-only rules (input_type == "kubernetes")
  */
 function extractPolicyRules(policyFiles: string[]): PolicyRule[] {
   const rules: PolicyRule[] = [];
@@ -216,33 +243,18 @@ function extractPolicyRules(policyFiles: string[]): PolicyRule[] {
     const content = readFileSync(policyFile, 'utf-8');
     const fileName = policyFile.split('/').pop() || '';
 
-    // Split content into rule blocks to analyze each rule's context
-    // Match: violations/warnings/suggestions contains result if { ... }
-    const ruleBlockPattern = /(violations|warnings|suggestions)\s+contains\s+result\s+if\s*\{([^}]*\{[^}]*\}[^}]*)\}/gs;
+    // Match rule definitions with severity
+    // Pattern: "rule": "rule-name", ... "severity": "block|warn|suggest"
+    const rulePattern = /"rule":\s*"([^"]+)"[^}]*"severity":\s*"(block|warn|suggest)"/g;
     
-    let blockMatch;
-    while ((blockMatch = ruleBlockPattern.exec(content)) !== null) {
-      const ruleBlock = blockMatch[0];
-      
-      // Skip Kubernetes-only rules (those with input_type == "kubernetes")
-      if (ruleBlock.includes('input_type == "kubernetes"')) {
-        continue;
-      }
-      
-      // Extract rule ID and severity from this block
-      const ruleIdMatch = ruleBlock.match(/"rule":\s*"([^"]+)"/);
-      const severityMatch = ruleBlock.match(/"severity":\s*"(block|warn|suggest)"/);
-      
-      if (ruleIdMatch && severityMatch) {
-        const [, ruleId] = ruleIdMatch;
-        const [, severity] = severityMatch;
-        
-        rules.push({
-          ruleId,
-          severity: severity as 'block' | 'warn' | 'suggest',
-          policyFile: fileName,
-        });
-      }
+    let match;
+    while ((match = rulePattern.exec(content)) !== null) {
+      const [, ruleId, severity] = match;
+      rules.push({
+        ruleId,
+        severity: severity as 'block' | 'warn' | 'suggest',
+        policyFile: fileName,
+      });
     }
   }
 
