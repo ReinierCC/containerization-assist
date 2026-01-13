@@ -10,10 +10,10 @@
 
 import { createToolContext } from '../dist/src/mcp/context.js';
 import fixDockerfileTool from '../dist/src/tools/fix-dockerfile/tool.js';
-import { loadAndMergeRegoPolicies } from '../dist/src/config/policy-io.js';
 import { createLogger } from '../dist/src/lib/logger.js';
 import { readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { loadAndMergeRegoPolicies } from '../dist/src/config/policy-rego.js';
 
 const logger = createLogger({ name: 'policy-enforcement-test', level: 'error' });
 
