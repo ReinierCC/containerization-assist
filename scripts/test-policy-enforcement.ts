@@ -151,6 +151,86 @@ const TEST_CASES: TestCase[] = [
     expectedViolations: ['avoid-apt-upgrade'],
     category: 'warning',
   },
+  // Additional warning tests
+  {
+    name: 'Alpine Images - Pass',
+    file: 'happy/alpine-image.Dockerfile',
+    expectedResult: 'pass',
+    category: 'warning',
+  },
+  {
+    name: 'Alpine Images - Warn',
+    file: 'sad/non-alpine-image.Dockerfile',
+    expectedResult: 'warn',
+    expectedViolations: ['recommend-alpine'],
+    category: 'warning',
+  },
+  {
+    name: 'Oversized Base - Pass',
+    file: 'happy/small-base-image.Dockerfile',
+    expectedResult: 'pass',
+    category: 'warning',
+  },
+  {
+    name: 'Oversized Base - Warn',
+    file: 'sad/oversized-base.Dockerfile',
+    expectedResult: 'warn',
+    expectedViolations: ['block-oversized-base'],
+    category: 'warning',
+  },
+  {
+    name: 'WORKDIR - Pass',
+    file: 'happy/with-workdir.Dockerfile',
+    expectedResult: 'pass',
+    category: 'warning',
+  },
+  {
+    name: 'WORKDIR - Warn',
+    file: 'sad/missing-workdir.Dockerfile',
+    expectedResult: 'warn',
+    expectedViolations: ['require-workdir'],
+    category: 'warning',
+  },
+  {
+    name: 'Sudo - Pass',
+    file: 'happy/no-sudo.Dockerfile',
+    expectedResult: 'pass',
+    category: 'warning',
+  },
+  {
+    name: 'Sudo - Warn',
+    file: 'sad/with-sudo.Dockerfile',
+    expectedResult: 'warn',
+    expectedViolations: ['avoid-sudo'],
+    category: 'warning',
+  },
+  // Additional blocking tests
+  {
+    name: 'Privileged Mode - Pass',
+    file: 'happy/no-privileged.Dockerfile',
+    expectedResult: 'pass',
+    category: 'blocking',
+  },
+  {
+    name: 'Privileged Mode - Fail',
+    file: 'sad/with-privileged.Dockerfile',
+    expectedResult: 'fail',
+    expectedViolations: ['block-privileged'],
+    category: 'blocking',
+  },
+  {
+    name: 'Host Network - Pass',
+    file: 'happy/no-host-network.Dockerfile',
+    expectedResult: 'pass',
+    category: 'blocking',
+  },
+  {
+    name: 'Host Network - Fail',
+    file: 'sad/with-host-network.Dockerfile',
+    expectedResult: 'fail',
+    expectedViolations: ['block-host-network'],
+    category: 'blocking',
+  },
 ];
 
 /**
