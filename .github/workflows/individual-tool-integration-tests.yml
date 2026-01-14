@@ -148,7 +148,7 @@ jobs:
 
   # Test policy enforcement with fix-dockerfile
   test-policy-enforcement:
-    name: Policy Enforcement Tests
+    name: fix-dockerfile Policy Enforcement Tests
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -242,16 +242,16 @@ jobs:
             
             BLOCKING_COUNT=$(jq -r '.coverage.blockingRules' policy-test-results.json)
             echo "### Blocking Violations ($BLOCKING_COUNT rules)" >> $GITHUB_STEP_SUMMARY
-            jq -r '.coverage.blockingRuleDetails[] | "- " + (if .tested then "✅" else "❌" end) + " \`" + .ruleId + "\`"' policy-test-results.json >> $GITHUB_STEP_SUMMARY
+            jq -r '.coverage.blockingRuleDetails[] | "- " + (if .tested then "✅" else "❌" end) + " `" + .ruleId + "`"' policy-test-results.json >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             
             WARNING_COUNT=$(jq -r '.coverage.warningRules' policy-test-results.json)
             echo "### Warnings ($WARNING_COUNT rules)" >> $GITHUB_STEP_SUMMARY
-            jq -r '.coverage.warningRuleDetails[] | "- " + (if .tested then "⚠️" else "❌" end) + " \`" + .ruleId + "\`"' policy-test-results.json >> $GITHUB_STEP_SUMMARY
+            jq -r '.coverage.warningRuleDetails[] | "- " + (if .tested then "⚠️" else "❌" end) + " `" + .ruleId + "`"' policy-test-results.json >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             
             echo "## Policies Tested" >> $GITHUB_STEP_SUMMARY
-            jq -r '.coverage.policyFiles[] | "- \`policies/" + . + "\`"' policy-test-results.json >> $GITHUB_STEP_SUMMARY
+            jq -r '.coverage.policyFiles[] | "- `policies/" + . + "`"' policy-test-results.json >> $GITHUB_STEP_SUMMARY
           else
             echo "⚠️ Test results file not found" >> $GITHUB_STEP_SUMMARY
           fi
