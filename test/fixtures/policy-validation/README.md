@@ -22,14 +22,18 @@ policy-validation/
 | Latest Tag | `specific-tags.Dockerfile` | `latest-tag.Dockerfile` | `base-images.rego` | `block-latest-tag` |
 | Deprecated Node | `modern-node.Dockerfile` | `deprecated-node.Dockerfile` | `base-images.rego` | `block-deprecated-node` |
 | Deprecated Python | `modern-python.Dockerfile` | `deprecated-python.Dockerfile` | `base-images.rego` | `block-deprecated-python` |
+| Alpine Variant | `alpine-variant.Dockerfile` | `non-alpine-variant.Dockerfile` | `base-images.rego` | `recommend-alpine` |
+| Base Image Size | `small-base-image.Dockerfile` | `oversized-base-image.Dockerfile` | `base-images.rego` | `block-oversized-base` |
 
 ### Warnings (Should Warn)
 
 | Test Case | Happy File | Sad File | Policy | Rule |
 |-----------|-----------|----------|--------|------|
 | User Directive | `with-user-directive.Dockerfile` | `missing-user-directive.Dockerfile` | `security-baseline.rego` | `require-user-directive` |
-| Healthcheck | `with-healthcheck.Dockerfile` | `missing-healthcheck.Dockerfile` | `security-baseline.rego` | `require-healthcheck` |
-| Apt Upgrade | `no-apt-upgrade.Dockerfile` | `apt-upgrade.Dockerfile` | `security-baseline.rego` | `avoid-apt-upgrade` |
+| Healthcheck | `with-healthcheck.Dockerfile` | `missing-healthcheck.Dockerfile` | `container-best-practices.rego` | `require-healthcheck` |
+| Apt Upgrade | `no-apt-upgrade.Dockerfile` | `apt-upgrade.Dockerfile` | `container-best-practices.rego` | `avoid-apt-upgrade` |
+| WORKDIR | `with-workdir.Dockerfile` | `missing-workdir.Dockerfile` | `container-best-practices.rego` | `require-workdir` |
+| Sudo Usage | `no-sudo.Dockerfile` | `sudo-used.Dockerfile` | `container-best-practices.rego` | `avoid-sudo` |
 
 ## Usage
 
