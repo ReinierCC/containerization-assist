@@ -93,7 +93,7 @@ violations contains result if {
 warnings contains result if {
 	is_dockerfile
 	regex.match(`(?im)FROM\s+mcr\.microsoft\.com/mirror/docker/library/(node|python|ruby):`, input.content)
-	not regex.match(`(?im)FROM\s+mcr\.microsoft\.com/mirror/docker/library/(node|python|ruby):[^\s]*alpine`, input.content)
+	not regex.match(`(?im)FROM\s+mcr\.microsoft\.com/mirror/docker/library/(node|python|ruby):(alpine[^\s]*|[^\s]*-alpine[^\s]*)`, input.content)
 
 	result := {
 		"rule": "recommend-alpine",
