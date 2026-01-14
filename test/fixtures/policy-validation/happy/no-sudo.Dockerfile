@@ -1,11 +1,12 @@
-# Test: require-user-directive (PASS)
-# Includes USER directive
+# Test: Elevated privileges check (PASS)
+# Does not use privileged commands
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 
 WORKDIR /app
 COPY . .
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+# Install packages directly
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 USER app
 EXPOSE 8080

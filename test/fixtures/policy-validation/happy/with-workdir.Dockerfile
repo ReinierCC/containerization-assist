@@ -1,5 +1,5 @@
-# Test: require-user-directive (PASS)
-# Includes USER directive
+# Test: require-workdir (PASS)
+# Includes WORKDIR directive
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 
 WORKDIR /app
