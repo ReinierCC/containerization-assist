@@ -158,7 +158,7 @@ violations contains result if {
 warnings contains result if {
 	is_dockerfile
 	regex.match(`(?im)FROM\s+mcr\.microsoft\.com/mirror/docker/library/(ubuntu|centos|fedora):`, input.content)
-	not regex.match(`(?im)FROM\s+mcr\.microsoft\.com/mirror/docker/library/(ubuntu|centos|fedora):[^\s]*minimal`, input.content)
+	not regex.match(`(?im)FROM\s+mcr\.microsoft\.com/mirror/docker/library/(ubuntu|centos|fedora):[^\s]*-minimal[^\s]*`, input.content)
 
 	result := {
 		"rule": "block-oversized-base",
