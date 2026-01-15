@@ -1,0 +1,10 @@
+{
+  "name": "build-test-node-app",
+  "version": "1.0.0",
+  "description": "Minimal Node.js app for build testing",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {}
+}

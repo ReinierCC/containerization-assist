@@ -1,0 +1,23 @@
+# Intentionally vulnerable dependencies for testing security scanners
+# ⚠️ DO NOT USE IN PRODUCTION
+
+# Django with known CVEs (SQL injection, directory traversal)
+Django==2.2.0
+
+# Flask with cookie parsing vulnerability
+Flask==1.1.1
+
+# PIL/Pillow with buffer overflow vulnerabilities
+Pillow==8.1.0
+
+# PyYAML with arbitrary code execution
+PyYAML==5.3.1
+
+# Jinja2 with ReDoS vulnerability
+Jinja2==2.11.2
+
+# Requests with proxy authentication header leak
+requests==2.25.0
+
+# urllib3 with CRLF injection
+urllib3==1.26.3
