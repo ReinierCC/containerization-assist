@@ -1,99 +1,110 @@
-# Vulnerable Images Test Fixtures
+# Vulnerable Images Test Documentation
 
-> ⚠️ **WARNING:** These images contain intentionally vulnerable dependencies and base images for testing security scanning tools. **NEVER deploy these in production.**
+> ⚠️ **WARNING:** The test images referenced here contain intentionally vulnerable software for testing security scanning tools. **NEVER deploy these in production.**
 
 ## Purpose
 
-These fixtures are used to test the `scan-image` tool with known, documented vulnerabilities. Each image has specific expected vulnerability counts based on the CVEs present.
+This documentation supports the `scan-image` integration test which uses known vulnerable images to verify security scanning functionality. The test **pulls pre-existing images from public registries** rather than building from local Dockerfiles.
+
+## Test Approach
+
+Instead of maintaining local Dockerfile fixtures that can break due to:
+- Package manager changes (npm, pip deprecations)
+- Registry availability
+- Build tool version mismatches
+
+We now pull well-known vulnerable images directly:
+
+```bash
+# The test script does this automatically:
+docker pull openjdk:8u181-jdk
+docker pull mcr.microsoft.com/dotnet/aspnet:3.1
+docker pull mcr.microsoft.com/dotnet/runtime:8.0-alpine
+```
 
 ## Test Images
 
-### 1. Node.js with Known CVEs (`node-cves/`)
+### 1. Java OpenJDK 8 with Known CVEs
 
-**Base Image:** `node:14.15.0` (Debian Buster)
-
-**Expected Vulnerabilities:**
-- Critical: 8-12
-- High: 25-35
-- Medium: 40-60
-
-**Primary CVEs:**
-- CVE-2021-44531 (Node.js)
-- CVE-2021-3711 (OpenSSL)
-- CVE-2021-23840 (OpenSSL)
-- CVE-2020-8203 (lodash - prototype pollution)
-- CVE-2020-28168 (axios - SSRF)
-- CVE-2021-44906 (minimist - prototype pollution)
-- CVE-2022-24999 (express - open redirect)
-
-**Why This Image:**
-- Node.js 14.15.0 was released Nov 2020 with multiple documented CVEs
-- Dependencies include packages with known vulnerabilities
-- Widely used pattern, reliable detection
-
-### 2. Python with Known CVEs (`python-cves/`)
-
-**Base Image:** `python:3.7.9` (Debian Buster)
+**Image:** `openjdk:8u181-jdk`
 
 **Expected Vulnerabilities:**
-- Critical: 5-10
-- High: 20-30
-- Medium: 35-50
-
-**Primary CVEs:**
-- CVE-2021-3177 (Python core - buffer overflow)
-- CVE-2021-23336 (Python core - web cache poisoning)
-- CVE-2021-33203, CVE-2021-33571 (Django - SQL injection, directory traversal)
-- CVE-2020-14343 (PyYAML - arbitrary code execution)
-- CVE-2020-28493 (Jinja2 - ReDoS)
-- CVE-2021-25287, CVE-2021-25288 (Pillow - buffer overflow)
+- Critical: 1+ (OpenSSL, glibc, etc.)
+- High: 5+
+- Medium: 50+
 
 **Why This Image:**
-- Python 3.7.9 was released Aug 2020 with multiple documented vulnerabilities
-- Dependencies include packages with known critical CVEs
-- Good balance of OS and application-level vulnerabilities
+- OpenJDK 8u181 was released in 2018
+- Based on Debian stretch (EOL)
+- Contains outdated OpenSSL, glibc, and other system libraries
+- Well-documented CVE history
+- Reliable for testing - image is immutable in Docker Hub
 
-### 3. Clean Baseline Image (`clean-baseline/`)
+### 2. .NET Core 3.1 (EOL) with Known CVEs
 
-**Base Image:** `mcr.microsoft.com/dotnet/runtime:8.0-alpine`
+**Image:** `mcr.microsoft.com/dotnet/aspnet:3.1`
+
+**Expected Vulnerabilities:**
+- Critical: 0+
+- High: 1+
+- Medium: varies
+
+**Why This Image:**
+- .NET Core 3.1 reached End of Life on December 13, 2022
+- No longer receives security patches
+- Contains known unpatched vulnerabilities
+- Official Microsoft image - reliable availability
+
+### 3. Clean .NET 8 Alpine Baseline
+
+**Image:** `mcr.microsoft.com/dotnet/runtime:8.0-alpine`
 
 **Expected Vulnerabilities:**
 - Critical: 0
 - High: 0
-- Medium: 0-5 (OS packages only)
+- Medium: minimal (OS packages only)
 
 **Why This Image:**
-- Microsoft official image, actively maintained
-- Alpine base minimizes attack surface
-- Used as a control to verify scanner correctly identifies secure images
-- Follows security best practices (non-root user, healthcheck)
+- Current LTS version of .NET
+- Alpine-based (minimal attack surface)
+- Actively maintained and patched
+- Control test - verifies scanner correctly identifies secure images
 
-## Usage
-
-These images are built and scanned by the integration test:
+## Running the Tests
 
 ```bash
+# Build the project first
+npm run build
+
 # Run the scan-image integration test
 tsx scripts/integration-test-scan-image.ts
 ```
 
-## Maintenance
+The test will:
+1. Verify Docker and Trivy are installed
+2. Pull the test images from registries
+3. Scan each image with Trivy
+4. Validate vulnerability counts against expected thresholds
+5. Verify threshold enforcement (fail on HIGH/CRITICAL)
+6. Clean up pulled images
 
-**Review Schedule:** Quarterly (April, July, October, January)
+## Advantages of Pull-Based Approach
 
-**Maintenance Tasks:**
-1. Verify CVE counts still match expectations (scanner DB updates may change counts)
-2. Update base image versions if they become unavailable
-3. Add new vulnerable packages if better examples emerge
-4. Update documentation with new CVE information
+| Aspect | Build-Based (Old) | Pull-Based (New) |
+|--------|-------------------|------------------|
+| Reliability | ❌ Package managers can break | ✅ Immutable images |
+| Speed | ❌ Full build each time | ✅ Layer caching |
+| Maintenance | ❌ Update Dockerfiles | ✅ No maintenance |
+| Consistency | ❌ Depends on build env | ✅ Same image everywhere |
+| CI/CD | ❌ Build failures | ✅ Just pull |
 
-**Reference:** See `VULNERABILITY_REFERENCE.md` for detailed CVE database research.
+## Reference Documentation
 
-## Scanner Compatibility
+- [VULNERABILITY_REFERENCE.md](./VULNERABILITY_REFERENCE.md) - Detailed CVE research
+- [SCANNER_COMPARISON.md](./SCANNER_COMPARISON.md) - Comparison of Trivy, Snyk, Grype
 
-These fixtures are designed to work with:
-- **Trivy** (primary scanner)
-- **Grype** (secondary validation)
-- **Snyk** (requires API key)
+## Notes
 
-See `SCANNER_COMPARISON.md` for detailed scanner comparison and installation instructions.
+- Vulnerability counts may vary slightly as Trivy's database is updated
+- The test uses minimum thresholds (e.g., "at least 5 HIGH") rather than exact counts
+- Clean baseline should always have 0 CRITICAL and 0 HIGH vulnerabilities

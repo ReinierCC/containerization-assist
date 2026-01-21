@@ -303,15 +303,6 @@ jobs:
           trivy image --download-db-only
           echo "✅ Trivy database updated"
 
-      - name: Verify test fixtures
-        run: |
-          echo "Verifying test fixtures exist..."
-          ls -la test/fixtures/vulnerable-images/
-          ls -la test/fixtures/vulnerable-images/node-cves/
-          ls -la test/fixtures/vulnerable-images/python-cves/
-          ls -la test/fixtures/vulnerable-images/clean-baseline/
-          echo "✅ All test fixtures found"
-
       - name: Run scan-image integration test
         id: scan-tests
         run: |
@@ -332,7 +323,8 @@ jobs:
       - name: Cleanup Docker images
         if: always()
         run: |
-          docker rmi -f test-scan:node-vulns test-scan:python-vulns test-scan:clean || true
+          docker rmi -f test-scan:java-vulns test-scan:dotnet-vulns test-scan:clean || true
+          docker rmi -f openjdk:8u181-jdk mcr.microsoft.com/dotnet/aspnet:3.1 mcr.microsoft.com/dotnet/runtime:8.0-alpine || true
 
       - name: Generate test summary
         if: always()
@@ -371,10 +363,10 @@ jobs:
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Test Images" >> $GITHUB_STEP_SUMMARY
-          echo "- \`node-cves\`: Node.js 14.15.0 with vulnerable npm packages" >> $GITHUB_STEP_SUMMARY
-          echo "- \`python-cves\`: Python 3.7.9 with vulnerable pip packages" >> $GITHUB_STEP_SUMMARY
-          echo "- \`clean-baseline\`: .NET 8.0 Alpine (control/baseline)" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Images (Pulled from Registries)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`openjdk:8u181-jdk\`: Java OpenJDK 8 (2018) with known CVEs" >> $GITHUB_STEP_SUMMARY
+          echo "- \`mcr.microsoft.com/dotnet/aspnet:3.1\`: .NET Core 3.1 (EOL Dec 2022)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`mcr.microsoft.com/dotnet/runtime:8.0-alpine\`: Clean .NET 8 baseline" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload test results
         if: always()
