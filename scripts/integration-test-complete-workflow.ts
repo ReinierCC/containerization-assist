@@ -294,10 +294,8 @@ async function main() {
     }
 
     // The generate-dockerfile tool creates a plan, not the actual Dockerfile
-    // For E2E testing, we'll create a Java Dockerfile based on the recommendations
-    const recommendedImage = dockerfileResult.value.recommendations?.baseImages?.[0]?.image;
-    // Fall back to Microsoft OpenJDK if no valid base image is recommended (including 'unknown')
-    const baseImage = recommendedImage && recommendedImage !== 'unknown' ? recommendedImage : 'mcr.microsoft.com/openjdk/jdk:21-ubuntu';
+    // For E2E testing, we'll create a Java Dockerfile using Microsoft OpenJDK
+    const baseImage = 'mcr.microsoft.com/openjdk/jdk:21-azurelinux';
     const generatedDockerfile = `# Generated Dockerfile for E2E test (Java)
 FROM ${baseImage} AS builder
 WORKDIR /app
@@ -315,13 +313,6 @@ WORKDIR /app
 
 # Copy JAR from builder
 COPY --from=builder /app/app.jar .
-
-# Create non-root user and set ownership
-RUN useradd -r -u 1001 -g root javauser && \\
-    chown 1001:0 /app/app.jar
-
-# Switch to non-root user
-USER 1001
 
 EXPOSE 8080
 
