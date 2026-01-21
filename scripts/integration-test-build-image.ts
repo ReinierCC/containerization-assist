@@ -58,45 +58,44 @@ interface TestResult {
  */
 const TEST_CASES: BuildTestCase[] = [
   {
-    name: 'Node.js Multi-Stage Build',
-    dockerContext: 'test/fixtures/build-scenarios/node',
-    tags: ['test-build:node-app'],
-    expectedSize: { min: 50_000_000, max: 200_000_000 }, // 50MB - 200MB
+    name: 'Java Multi-Stage Build',
+    dockerContext: 'test/fixtures/build-scenarios/java',
+    tags: ['test-build:java-app'],
+    expectedSize: { min: 100_000_000, max: 400_000_000 }, // 100MB - 400MB
     expectedLayers: { min: 5, max: 20 },
     shouldSucceed: true,
-    description: 'Tests Node.js build with Alpine base and multi-stage',
+    description: 'Tests Java build with Eclipse Temurin JRE and multi-stage',
   },
   {
-    name: 'Node.js with Build Args',
-    dockerContext: 'test/fixtures/build-scenarios/node',
-    tags: ['test-build:node-args'],
+    name: 'Java with Build Args',
+    dockerContext: 'test/fixtures/build-scenarios/java',
+    tags: ['test-build:java-args'],
     buildArgs: {
-      NODE_ENV: 'production',
       VERSION: '2.0.0',
     },
-    expectedSize: { min: 50_000_000, max: 200_000_000 },
+    expectedSize: { min: 100_000_000, max: 400_000_000 },
     shouldSucceed: true,
-    description: 'Tests build argument injection',
+    description: 'Tests Java build argument injection',
   },
   {
-    name: 'Python Multi-Stage Build',
-    dockerContext: 'test/fixtures/build-scenarios/python',
-    tags: ['test-build:python-app'],
-    expectedSize: { min: 100_000_000, max: 300_000_000 }, // 100MB - 300MB
+    name: '.NET Multi-Stage Build',
+    dockerContext: 'test/fixtures/build-scenarios/dotnet',
+    tags: ['test-build:dotnet-app'],
+    expectedSize: { min: 80_000_000, max: 300_000_000 }, // 80MB - 300MB
     expectedLayers: { min: 5, max: 25 },
     shouldSucceed: true,
-    description: 'Tests Python build with virtual environment and multi-stage',
+    description: 'Tests .NET 8 build with ASP.NET runtime and multi-stage',
   },
   {
-    name: 'Python with Build Args',
-    dockerContext: 'test/fixtures/build-scenarios/python',
-    tags: ['test-build:python-args'],
+    name: '.NET with Build Args',
+    dockerContext: 'test/fixtures/build-scenarios/dotnet',
+    tags: ['test-build:dotnet-args'],
     buildArgs: {
       VERSION: '3.0.0',
     },
-    expectedSize: { min: 100_000_000, max: 300_000_000 },
+    expectedSize: { min: 80_000_000, max: 300_000_000 },
     shouldSucceed: true,
-    description: 'Tests Python build with version argument',
+    description: 'Tests .NET build with version argument',
   },
 ];
 

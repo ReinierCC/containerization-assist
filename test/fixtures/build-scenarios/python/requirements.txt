@@ -1,2 +1,0 @@
-# No external dependencies needed for this minimal app
-# This file exists for Dockerfile compatibility

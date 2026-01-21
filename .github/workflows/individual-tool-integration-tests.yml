@@ -651,8 +651,8 @@ jobs:
         run: |
           echo "Verifying test fixtures exist..."
           ls -la test/fixtures/build-scenarios/
-          ls -la test/fixtures/build-scenarios/node/
-          ls -la test/fixtures/build-scenarios/python/
+          ls -la test/fixtures/build-scenarios/java/
+          ls -la test/fixtures/build-scenarios/dotnet/
           echo "✅ All test fixtures found"
 
       - name: Run build-image integration test
@@ -704,8 +704,8 @@ jobs:
           
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Languages Tested" >> $GITHUB_STEP_SUMMARY
-          echo "- **Node.js**: Multi-stage build with Alpine" >> $GITHUB_STEP_SUMMARY
-          echo "- **Python**: Multi-stage build with virtual environment" >> $GITHUB_STEP_SUMMARY
+          echo "- **Java**: Multi-stage build with Eclipse Temurin JRE" >> $GITHUB_STEP_SUMMARY
+          echo "- **.NET**: Multi-stage build with ASP.NET 8 runtime" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Features Tested" >> $GITHUB_STEP_SUMMARY
           echo "- Multi-stage builds" >> $GITHUB_STEP_SUMMARY
