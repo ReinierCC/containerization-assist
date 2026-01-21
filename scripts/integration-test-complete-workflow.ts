@@ -214,6 +214,7 @@ async function main() {
   
   // Copy sample Java app files
   copyFileSync(join(sampleAppPath, 'App.java'), join(tempWorkDir, 'App.java'));
+  copyFileSync(join(sampleAppPath, 'pom.xml'), join(tempWorkDir, 'pom.xml'));
   
   // Create context
   const ctx = createToolContext(logger);
