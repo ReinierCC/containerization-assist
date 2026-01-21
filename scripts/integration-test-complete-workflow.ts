@@ -296,11 +296,10 @@ async function main() {
     // The generate-dockerfile tool creates a plan, not the actual Dockerfile
     // For E2E testing, we'll create a Java Dockerfile based on the recommendations
     const recommendedImage = dockerfileResult.value.recommendations?.baseImages?.[0]?.image;
-    // Fall back to eclipse-temurin:21-jdk-alpine if no valid base image is recommended (including 'unknown')
-    const buildImage = recommendedImage && recommendedImage !== 'unknown' ? recommendedImage : 'eclipse-temurin:21-jdk-alpine';
-    const runtimeImage = buildImage.replace('-jdk-', '-jre-');
+    // Fall back to Microsoft OpenJDK if no valid base image is recommended (including 'unknown')
+    const baseImage = recommendedImage && recommendedImage !== 'unknown' ? recommendedImage : 'mcr.microsoft.com/openjdk/jdk:21-ubuntu';
     const generatedDockerfile = `# Generated Dockerfile for E2E test (Java)
-FROM ${buildImage} AS builder
+FROM ${baseImage} AS builder
 WORKDIR /app
 
 # Copy source files
@@ -310,18 +309,19 @@ COPY App.java .
 RUN javac App.java && \\
     jar cfe app.jar com.example.App *.class
 
-# Runtime stage - use JRE only
-FROM ${runtimeImage}
+# Runtime stage
+FROM ${baseImage}
 WORKDIR /app
 
-# Create non-root user
-RUN addgroup -g 1001 -S javauser && adduser -S javauser -u 1001 -G javauser
-
 # Copy JAR from builder
-COPY --from=builder --chown=javauser:javauser /app/app.jar .
+COPY --from=builder /app/app.jar .
+
+# Create non-root user and set ownership
+RUN useradd -r -u 1001 -g root javauser && \\
+    chown 1001:0 /app/app.jar
 
 # Switch to non-root user
-USER javauser
+USER 1001
 
 EXPOSE 8080
 
@@ -334,8 +334,7 @@ CMD ["java", "-jar", "app.jar"]
     writeFileSync(join(tempWorkDir, 'Dockerfile'), generatedDockerfile);
     
     console.log('   ✅ Dockerfile generated');
-    console.log(`      Build image: ${buildImage}`);
-    console.log(`      Runtime image: ${runtimeImage}`);
+    console.log(`      Base image: ${baseImage}`);
     console.log(`      Multi-stage: Yes`);
     
     results.push({
@@ -346,8 +345,7 @@ CMD ["java", "-jar", "app.jar"]
       message: 'Dockerfile generated successfully',
       duration: step2Duration,
       details: {
-        buildImage,
-        runtimeImage,
+        baseImage,
         hasHealthcheck: true,
         isMultistage: true,
       },
