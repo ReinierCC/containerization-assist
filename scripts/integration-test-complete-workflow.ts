@@ -179,7 +179,7 @@ async function main() {
   
   // Paths
   const fixturesPath = resolve('test/fixtures/complete-workflow');
-  const sampleAppPath = join(fixturesPath, 'sample-app');
+  const sampleAppPath = join(fixturesPath, 'sample-java-app');
   const tempWorkDir = join(os.tmpdir(), 'e2e-workflow-test-' + Date.now());
   
   // Determine platform
@@ -212,14 +212,8 @@ async function main() {
   console.log(`\n📁 Setting up work directory: ${tempWorkDir}\n`);
   mkdirSync(tempWorkDir, { recursive: true });
   
-  // Copy sample app files
-  copyFileSync(join(sampleAppPath, 'package.json'), join(tempWorkDir, 'package.json'));
-  copyFileSync(join(sampleAppPath, 'index.js'), join(tempWorkDir, 'index.js'));
-  // Copy package-lock.json if it exists (required for npm ci)
-  const packageLockPath = join(sampleAppPath, 'package-lock.json');
-  if (existsSync(packageLockPath)) {
-    copyFileSync(packageLockPath, join(tempWorkDir, 'package-lock.json'));
-  }
+  // Copy sample Java app files
+  copyFileSync(join(sampleAppPath, 'App.java'), join(tempWorkDir, 'App.java'));
   
   // Create context
   const ctx = createToolContext(logger);
@@ -252,8 +246,8 @@ async function main() {
 
     const analysis = analyzeResult.value;
     console.log('   ✅ Repository analyzed');
-    console.log(`      Language: ${analysis.modules?.[0]?.language || analysis.language || 'javascript'}`);
-    console.log(`      Framework: ${analysis.modules?.[0]?.frameworks?.[0]?.name || analysis.framework || 'express'}`);
+    console.log(`      Language: ${analysis.modules?.[0]?.language || analysis.language || 'java'}`);
+    console.log(`      Framework: ${analysis.modules?.[0]?.frameworks?.[0]?.name || analysis.framework || 'none'}`);
     
     results.push({
       step: 1,
@@ -278,9 +272,9 @@ async function main() {
     const step2Start = Date.now();
     const dockerfileResult = await generateDockerfileTool.handler({
       repositoryPath: tempWorkDir,
-      language: analysis.modules?.[0]?.language || analysis.language || 'javascript',
-      languageVersion: analysis.modules?.[0]?.buildSystems?.[0]?.languageVersion || analysis.languageVersion || '20',
-      framework: analysis.modules?.[0]?.frameworks?.[0]?.name || analysis.framework || 'express',
+      language: analysis.modules?.[0]?.language || analysis.language || 'java',
+      languageVersion: analysis.modules?.[0]?.buildSystems?.[0]?.languageVersion || analysis.languageVersion || '21',
+      framework: analysis.modules?.[0]?.frameworks?.[0]?.name || analysis.framework,
       environment: 'production',
       targetPlatform: platform,
     }, ctx);
@@ -299,39 +293,48 @@ async function main() {
     }
 
     // The generate-dockerfile tool creates a plan, not the actual Dockerfile
-    // For E2E testing, we'll create a simple Dockerfile based on the recommendations
-    const baseImage = dockerfileResult.value.recommendations?.baseImages?.[0]?.image || 'node:20-alpine';
-    const generatedDockerfile = `# Generated Dockerfile for E2E test
-FROM ${baseImage} AS builder
+    // For E2E testing, we'll create a Java Dockerfile based on the recommendations
+    const recommendedImage = dockerfileResult.value.recommendations?.baseImages?.[0]?.image;
+    // Fall back to eclipse-temurin:21-jdk-alpine if no valid base image is recommended (including 'unknown')
+    const buildImage = recommendedImage && recommendedImage !== 'unknown' ? recommendedImage : 'eclipse-temurin:21-jdk-alpine';
+    const runtimeImage = buildImage.replace('-jdk-', '-jre-');
+    const generatedDockerfile = `# Generated Dockerfile for E2E test (Java)
+FROM ${buildImage} AS builder
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
 
-FROM ${baseImage}
+# Copy source files
+COPY App.java .
+
+# Compile the application
+RUN javac App.java && \\
+    jar cfe app.jar com.example.App *.class
+
+# Runtime stage - use JRE only
+FROM ${runtimeImage}
 WORKDIR /app
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
+RUN addgroup -g 1001 -S javauser && adduser -S javauser -u 1001 -G javauser
 
-COPY --from=builder /app/node_modules ./node_modules
-COPY . .
+# Copy JAR from builder
+COPY --from=builder --chown=javauser:javauser /app/app.jar .
 
-# Change ownership to non-root user
-RUN chown -R nodejs:nodejs /app
+# Switch to non-root user
+USER javauser
 
-EXPOSE 3000
-USER nodejs
+EXPOSE 8080
 
-# Use Node for health check instead of wget (more portable)
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \\
-  CMD node -e "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \\
+  CMD java -cp app.jar com.example.App health || exit 1
 
-CMD ["node", "index.js"]
+CMD ["java", "-jar", "app.jar"]
 `;
     writeFileSync(join(tempWorkDir, 'Dockerfile'), generatedDockerfile);
     
     console.log('   ✅ Dockerfile generated');
-    console.log(`      Base image: ${baseImage}`);
+    console.log(`      Build image: ${buildImage}`);
+    console.log(`      Runtime image: ${runtimeImage}`);
     console.log(`      Multi-stage: Yes`);
     
     results.push({
@@ -342,7 +345,8 @@ CMD ["node", "index.js"]
       message: 'Dockerfile generated successfully',
       duration: step2Duration,
       details: {
-        baseImage,
+        buildImage,
+        runtimeImage,
         hasHealthcheck: true,
         isMultistage: true,
       },
