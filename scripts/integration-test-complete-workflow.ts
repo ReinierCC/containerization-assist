@@ -79,7 +79,18 @@ function verifyToolInstalled(toolName: string, versionCommand: string): boolean 
 }
 
 /**
+ * Custom error for terminal pod states that should fail fast
+ */
+class TerminalPodStateError extends Error {
+  constructor(public readonly podStatus: string) {
+    super(`Pod entered terminal failure state: ${podStatus}`);
+    this.name = 'TerminalPodStateError';
+  }
+}
+
+/**
  * Wait for a condition with timeout
+ * Throws TerminalPodStateError immediately for fail-fast behavior
  */
 async function waitForCondition(
   description: string,
@@ -96,8 +107,12 @@ async function waitForCondition(
       if (condition()) {
         return true;
       }
-    } catch {
-      // Condition check failed, continue waiting
+    } catch (error) {
+      // Propagate terminal errors immediately (fail fast)
+      if (error instanceof TerminalPodStateError) {
+        throw error;
+      }
+      // Transient error, continue waiting
     }
     
     if (attempts % 5 === 0) {
@@ -199,7 +214,8 @@ async function main() {
   }
 
   if (!hasTrivy) {
-    console.warn('\n⚠️ Trivy not installed - scan-image step will be skipped');
+    console.error('\n❌ Trivy not installed. This is a required dependency for the E2E workflow.');
+    process.exit(1);
   }
 
   // Verify fixtures exist
@@ -407,65 +423,68 @@ CMD ["java", "-jar", "app.jar"]
     });
 
     // ========================================================================
-    // STEP 4: Scan Image (optional - skip if Trivy not installed)
+    // STEP 4: Scan Image
     // ========================================================================
     console.log('\n' + '─'.repeat(70));
     console.log('🔒 Step 4: Scanning image with scan-image');
     console.log('─'.repeat(70));
     
-    if (hasTrivy) {
-      const step4Start = Date.now();
-      const scanResult = await scanImageTool.handler({
-        imageId: 'sample-workflow-app:v1.0.0',
-        scanner: 'trivy',
-        severity: 'HIGH',
-        scanType: 'vulnerability',
-        enableAISuggestions: false,
-      }, ctx);
-      const step4Duration = Date.now() - step4Start;
+    const step4Start = Date.now();
+    const scanResult = await scanImageTool.handler({
+      imageId: 'sample-workflow-app:v1.0.0',
+      scanner: 'trivy',
+      severity: 'HIGH',
+      scanType: 'vulnerability',
+      enableAISuggestions: false,
+    }, ctx);
+    const step4Duration = Date.now() - step4Start;
 
-      if (!scanResult.ok) {
-        // Scan failure is not fatal for workflow - log and continue
-        console.log(`   ⚠️ Scan completed with issues: ${scanResult.error}`);
-        results.push({
-          step: 4,
-          name: 'Scan Image',
-          tool: 'scan-image',
-          passed: true, // Mark as passed since it ran
-          message: `Scan completed: ${scanResult.error}`,
-          duration: step4Duration,
-        });
-      } else {
-        const vulnCounts = scanResult.value.vulnerabilities;
-        console.log('   ✅ Image scanned');
-        console.log(`      Critical: ${vulnCounts.critical || 0}`);
-        console.log(`      High: ${vulnCounts.high || 0}`);
-        console.log(`      Medium: ${vulnCounts.medium || 0}`);
-        console.log(`      Low: ${vulnCounts.low || 0}`);
-        
-        results.push({
-          step: 4,
-          name: 'Scan Image',
-          tool: 'scan-image',
-          passed: true,
-          message: 'Image scanned successfully',
-          duration: step4Duration,
-          details: {
-            vulnerabilities: vulnCounts,
-          },
-        });
-      }
-    } else {
-      console.log('   ⏭️ Skipped (Trivy not installed)');
+    if (!scanResult.ok) {
+      console.log(`   ❌ Scan failed: ${scanResult.error}`);
       results.push({
         step: 4,
         name: 'Scan Image',
         tool: 'scan-image',
-        passed: true,
-        message: 'Skipped - Trivy not installed',
-        duration: 0,
+        passed: false,
+        message: `Scan failed: ${scanResult.error}`,
+        duration: step4Duration,
       });
+      throw new Error('scan-image failed');
     }
+    
+    const vulnCounts = scanResult.value.vulnerabilities;
+    
+    // Validate scan result structure
+    if (vulnCounts === undefined || vulnCounts === null) {
+      console.log(`   ❌ Scan result missing vulnerability counts`);
+      results.push({
+        step: 4,
+        name: 'Scan Image',
+        tool: 'scan-image',
+        passed: false,
+        message: 'Scan failed: vulnerability counts not returned',
+        duration: step4Duration,
+      });
+      throw new Error('scan-image failed: invalid result structure');
+    }
+    
+    console.log('   ✅ Image scanned');
+    console.log(`      Critical: ${vulnCounts.critical}`);
+    console.log(`      High: ${vulnCounts.high}`);
+    console.log(`      Medium: ${vulnCounts.medium}`);
+    console.log(`      Low: ${vulnCounts.low}`);
+    
+    results.push({
+      step: 4,
+      name: 'Scan Image',
+      tool: 'scan-image',
+      passed: true,
+      message: 'Image scanned successfully',
+      duration: step4Duration,
+      details: {
+        vulnerabilities: vulnCounts,
+      },
+    });
 
     // ========================================================================
     // STEP 5: Prepare Cluster with Local Registry
@@ -650,10 +669,11 @@ CMD ["java", "-jar", "app.jar"]
 
     // Wait for deployment to be ready
     console.log('   ⏳ Waiting for deployment to be ready...');
-    const ready = await waitForCondition(
-      'deployment ready',
-      () => {
-        try {
+    
+    try {
+      const ready = await waitForCondition(
+        'deployment ready',
+        () => {
           // Check for CrashLoopBackOff or other failure states first
           const podStatus = execSync(
             'kubectl get pods -l app=sample-workflow-app -o jsonpath="{.items[*].status.containerStatuses[*].state.waiting.reason}"',
@@ -661,8 +681,7 @@ CMD ["java", "-jar", "app.jar"]
           ).trim();
           
           if (podStatus.includes('CrashLoopBackOff') || podStatus.includes('ImagePullBackOff') || podStatus.includes('ErrImagePull')) {
-            console.log(`      ⚠️ Pod failure detected: ${podStatus}`);
-            return false;
+            throw new TerminalPodStateError(podStatus);
           }
           
           // Check deployment Available condition (more reliable than readyReplicas)
@@ -677,17 +696,21 @@ CMD ["java", "-jar", "app.jar"]
           ).trim();
           
           return available === 'True' && parseInt(readyReplicas || '0') >= 2;
-        } catch {
-          return false;
-        }
-      },
-      180000, // 3 minute timeout (JVM startup can be slow in CI)
-      3000,
-    );
-
-    const step8Duration = Date.now() - step8Start;
-
-    if (!ready) {
+        },
+        180000, // 3 minute timeout (JVM startup can be slow in CI)
+        3000,
+      );
+      
+      if (!ready) {
+        throw new Error('Deployment did not become ready in time');
+      }
+    } catch (error) {
+      const step8Duration = Date.now() - step8Start;
+      
+      if (error instanceof TerminalPodStateError) {
+        console.log(`      ❌ Pod entered terminal failure state: ${error.podStatus}`);
+      }
+      
       // Get debug info
       console.log('\n   Debug info:');
       try {
@@ -702,14 +725,15 @@ CMD ["java", "-jar", "app.jar"]
         name: 'Deploy to Kubernetes',
         tool: 'kubectl',
         passed: false,
-        message: 'Deployment did not become ready in time',
+        message: error instanceof Error ? error.message : String(error),
         duration: step8Duration,
       });
-      throw new Error('Deployment did not become ready');
+      throw error;
     }
 
     console.log('   ✅ Deployment ready (2/2 replicas)');
     
+    const step8Duration = Date.now() - step8Start;
     results.push({
       step: 8,
       name: 'Deploy to Kubernetes',
