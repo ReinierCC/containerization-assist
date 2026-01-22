@@ -121,6 +121,7 @@
     "js-yaml": "^4.1.0",
     "kubernetes-models": "^4.5.1",
     "pino": "^9.14.0",
+    "protobufjs": "^8.0.0",
     "tmp": "^0.2.5",
     "validate-dockerfile": "^1.8.1",
     "xml2js": "^0.6.2",

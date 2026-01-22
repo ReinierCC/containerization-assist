@@ -30,7 +30,7 @@ export type { ToolContext, ProgressReporter };
 /**
  * Re-exported as CoreContextOptions to distinguish from MCP-specific ContextOptions.
  * The core version only accepts ProgressReporter functions, while the MCP version
- * also accepts MCP request objects with progress tokens.
+ * also accepts simple progress tokens (string or number).
  */
 export type { CoreContextOptions };
 
@@ -39,27 +39,11 @@ export { createCoreContext as createCoreToolContext };
 // ===== MCP-SPECIFIC TYPES =====
 
 /**
- * MCP request object that may contain a progress token.
- * This matches the shape of MCP protocol request structure.
- *
- * The progress token is located at `params._meta.progressToken` per MCP spec.
- * @see https://modelcontextprotocol.io/specification#progress
- */
-export interface MCPProgressRequest {
-  params?: {
-    _meta?: {
-      progressToken?: string | number;
-    };
-  };
-}
-
-/**
  * Progress input can be:
- * - A direct ProgressReporter function
- * - An MCP request object with optional progress token
+ * - A simple progress token (string or number) from MCP protocol
  * - null or undefined for no progress reporting
  */
-export type ProgressInput = ProgressReporter | MCPProgressRequest | null | undefined;
+export type ProgressInput = string | number | null | undefined;
 
 /**
  * MCP context options with notification support.
@@ -68,17 +52,15 @@ export type ProgressInput = ProgressReporter | MCPProgressRequest | null | undef
  * progress notifications via the MCP protocol.
  *
  * Note: This does not extend CoreContextOptions because the progress
- * property has a different type (accepts MCP request objects).
+ * property has a different type (accepts simple tokens: string or number).
  */
 export interface ContextOptions {
   /** Optional abort signal for cancellation */
   signal?: AbortSignal;
 
   /**
-   * Progress can be:
-   * - A ProgressReporter function directly
-   * - An MCP request object with progress token (will be extracted)
-   * - undefined for no progress reporting
+   * Progress token from MCP protocol.
+   * When provided along with sendNotification, enables progress notifications.
    */
   progress?: ProgressInput;
 
@@ -122,7 +104,7 @@ export function createToolContext(logger: Logger, options: ContextOptions = {}):
   const { sendNotification, progress, signal, policy } = options;
 
   // Extract progress reporter using MCP-aware helper
-  // This handles both direct ProgressReporter functions and MCP request objects with progress tokens
+  // This handles simple progress tokens (string or number) and converts them to ProgressReporter functions
   const progressReporter = extractProgressReporter(progress, logger, sendNotification);
 
   // Build options object explicitly (clearer than conditional spread)
