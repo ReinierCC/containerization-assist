@@ -777,7 +777,6 @@ jobs:
         run: |
           echo "Verifying test fixtures exist..."
           ls -la test/fixtures/complete-workflow/
-          ls -la test/fixtures/complete-workflow/sample-app/
           ls -la test/fixtures/complete-workflow/kubernetes/
           echo "✅ All test fixtures found"
 
