@@ -246,9 +246,24 @@ async function main() {
     }
 
     const analysis = analyzeResult.value;
+    const detectedLanguage = analysis.modules?.[0]?.language || analysis.language;
+    const detectedFramework = analysis.modules?.[0]?.frameworks?.[0]?.name || analysis.framework;
+    
+    if (!detectedLanguage) {
+      results.push({
+        step: 1,
+        name: 'Analyze Repository',
+        tool: 'analyze-repo',
+        passed: false,
+        message: 'Analysis failed: no language detected',
+        duration: step1Duration,
+      });
+      throw new Error('analyze-repo failed: no language detected');
+    }
+    
     console.log('   ✅ Repository analyzed');
-    console.log(`      Language: ${analysis.modules?.[0]?.language || analysis.language || 'java'}`);
-    console.log(`      Framework: ${analysis.modules?.[0]?.frameworks?.[0]?.name || analysis.framework || 'none'}`);
+    console.log(`      Language: ${detectedLanguage}`);
+    console.log(`      Framework: ${detectedFramework || 'none'}`);
     
     results.push({
       step: 1,
@@ -258,8 +273,8 @@ async function main() {
       message: 'Repository analyzed successfully',
       duration: step1Duration,
       details: {
-        language: analysis.modules?.[0]?.language || analysis.language,
-        framework: analysis.modules?.[0]?.frameworks?.[0]?.name || analysis.framework,
+        language: detectedLanguage,
+        framework: detectedFramework,
       },
     });
 
@@ -270,12 +285,14 @@ async function main() {
     console.log('📝 Step 2: Generating Dockerfile with generate-dockerfile');
     console.log('─'.repeat(70));
     
+    const detectedVersion = analysis.modules?.[0]?.buildSystems?.[0]?.languageVersion || analysis.languageVersion || '21';
+    
     const step2Start = Date.now();
     const dockerfileResult = await generateDockerfileTool.handler({
       repositoryPath: tempWorkDir,
-      language: analysis.modules?.[0]?.language || analysis.language || 'java',
-      languageVersion: analysis.modules?.[0]?.buildSystems?.[0]?.languageVersion || analysis.languageVersion || '21',
-      framework: analysis.modules?.[0]?.frameworks?.[0]?.name || analysis.framework,
+      language: detectedLanguage,
+      languageVersion: detectedVersion,
+      framework: detectedFramework,
       environment: 'production',
       targetPlatform: platform,
     }, ctx);
