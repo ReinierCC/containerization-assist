@@ -35,8 +35,8 @@ import verifyDeployTool from '../dist/src/tools/verify-deploy/tool.js';
 import { execSync } from 'child_process';
 import { createLogger } from '../dist/src/lib/logger.js';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'fs';
-import { join, resolve, dirname } from 'path';
-import { DOCKER_PLATFORMS, DockerPlatform } from '../dist/src/tools/shared/schemas.js';
+import { join, resolve } from 'path';
+import { DockerPlatform } from '../dist/src/tools/shared/schemas.js';
 import os from 'os';
 
 const logger = createLogger({ name: 'e2e-workflow-test', level: 'error' });
