@@ -9,9 +9,10 @@ WORKDIR /app
 # Copy source files
 COPY App.java .
 
-# Compile the application
-RUN javac App.java && \
-    jar cfe app.jar com.example.App *.class
+# Compile the application with package structure
+# -d . creates com/example/App.class directory structure
+RUN javac -d . App.java && \
+    jar cfe app.jar com.example.App com/
 
 # Runtime stage - use JRE only
 FROM eclipse-temurin:21-jre-alpine AS runtime

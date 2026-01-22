@@ -303,9 +303,10 @@ WORKDIR /app
 # Copy source files
 COPY App.java .
 
-# Compile the application
-RUN javac App.java && \\
-    jar cfe app.jar com.example.App *.class
+# Compile the application with package structure
+# -d . creates com/example/App.class directory structure
+RUN javac -d . App.java && \\
+    jar cfe app.jar com.example.App com/
 
 # Runtime stage
 FROM ${baseImage}
@@ -636,16 +637,34 @@ CMD ["java", "-jar", "app.jar"]
       'deployment ready',
       () => {
         try {
-          const status = execSync('kubectl get deployment sample-workflow-app -o jsonpath="{.status.readyReplicas}"', {
-            encoding: 'utf-8',
-            stdio: 'pipe',
-          });
-          return parseInt(status) >= 2;
+          // Check for CrashLoopBackOff or other failure states first
+          const podStatus = execSync(
+            'kubectl get pods -l app=sample-workflow-app -o jsonpath="{.items[*].status.containerStatuses[*].state.waiting.reason}"',
+            { encoding: 'utf-8', stdio: 'pipe' }
+          ).trim();
+          
+          if (podStatus.includes('CrashLoopBackOff') || podStatus.includes('ImagePullBackOff') || podStatus.includes('ErrImagePull')) {
+            console.log(`      ⚠️ Pod failure detected: ${podStatus}`);
+            return false;
+          }
+          
+          // Check deployment Available condition (more reliable than readyReplicas)
+          const available = execSync(
+            'kubectl get deployment sample-workflow-app -o jsonpath="{.status.conditions[?(@.type==\'Available\')].status}"',
+            { encoding: 'utf-8', stdio: 'pipe' }
+          ).trim();
+          
+          const readyReplicas = execSync(
+            'kubectl get deployment sample-workflow-app -o jsonpath="{.status.readyReplicas}"',
+            { encoding: 'utf-8', stdio: 'pipe' }
+          ).trim();
+          
+          return available === 'True' && parseInt(readyReplicas || '0') >= 2;
         } catch {
           return false;
         }
       },
-      120000, // 2 minute timeout
+      180000, // 3 minute timeout (JVM startup can be slow in CI)
       3000,
     );
 
