@@ -130,12 +130,15 @@ function getImageMetadata(imageTag: string): { size: number; layers: number } | 
     );
     const size = parseInt(sizeOutput.trim(), 10);
 
-    // Get layer count
+    // Get layer count (count lines in JavaScript instead of shell pipeline)
     const layersOutput = execSync(
-      `docker history ${imageTag} --format='{{.ID}}' | wc -l`,
+      `docker history ${imageTag} --format='{{.ID}}'`,
       { encoding: 'utf-8', stdio: 'pipe' },
     );
-    const layers = parseInt(layersOutput.trim(), 10);
+    const layers = layersOutput
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0).length;
 
     return { size, layers };
   } catch {

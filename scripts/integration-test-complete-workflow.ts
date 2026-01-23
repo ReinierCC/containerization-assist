@@ -205,7 +205,9 @@ async function main() {
   console.log('📋 Checking prerequisites...\n');
   const hasDocker = verifyToolInstalled('Docker', 'docker --version');
   const hasKind = verifyToolInstalled('kind', 'kind --version');
-  const hasKubectl = verifyToolInstalled('kubectl', 'kubectl version --client --short 2>/dev/null || kubectl version --client');
+  // Try short version first, fall back to long version (avoids shell-specific operators)
+  const hasKubectl = verifyToolInstalled('kubectl', 'kubectl version --client --short') 
+    || verifyToolInstalled('kubectl', 'kubectl version --client');
   const hasTrivy = verifyToolInstalled('Trivy', 'trivy --version');
 
   if (!hasDocker || !hasKind || !hasKubectl) {

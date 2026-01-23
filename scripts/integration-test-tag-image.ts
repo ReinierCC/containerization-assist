@@ -162,13 +162,16 @@ function getImageId(tag: string): string | null {
 function cleanupTestImages(): void {
   console.log('   Removing test images...');
   try {
-    // Get all images with test-tag-image prefix
-    const images = execSync('docker images --format "{{.Repository}}:{{.Tag}}" | grep test-tag-image || true', {
+    // Get all images and filter in JavaScript (avoids shell-specific grep)
+    const imagesOutput = execSync('docker images --format "{{.Repository}}:{{.Tag}}"', {
       encoding: 'utf-8',
       stdio: 'pipe',
     });
     
-    const imagesToRemove = images.split('\n').filter((img) => img.trim());
+    const imagesToRemove = imagesOutput
+      .split('\n')
+      .map((img) => img.trim())
+      .filter((img) => img && img.includes('test-tag-image'));
     for (const img of imagesToRemove) {
       try {
         execSync(`docker rmi -f ${img}`, { stdio: 'pipe' });

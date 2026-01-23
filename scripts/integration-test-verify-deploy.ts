@@ -25,6 +25,7 @@ import { execSync } from 'child_process';
 import { createLogger } from '../dist/src/lib/logger.js';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import os from 'os';
 import { DOCKER_PLATFORMS, DockerPlatform } from '../dist/src/tools/shared/schemas.js';
 
 const logger = createLogger({ name: 'verify-deploy-test', level: 'error' });
@@ -298,7 +299,7 @@ async function main() {
     let manifest = readFileSync(manifestPath, 'utf-8');
     manifest = manifest.replace(/localhost:5000/g, `localhost:${registryPort}`);
     
-    const tempManifestPath = '/tmp/test-web-app-deployment.yaml';
+    const tempManifestPath = join(os.tmpdir(), `test-web-app-deployment-${Date.now()}.yaml`);
     writeFileSync(tempManifestPath, manifest);
     
     try {
