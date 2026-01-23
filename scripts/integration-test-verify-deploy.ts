@@ -20,7 +20,6 @@
 
 import { createToolContext } from '../dist/src/mcp/context.js';
 import prepareCluster from '../dist/src/tools/prepare-cluster/tool.js';
-import pushImageTool from '../dist/src/tools/push-image/tool.js';
 import verifyDeployTool from '../dist/src/tools/verify-deploy/tool.js';
 import { execSync } from 'child_process';
 import { createLogger } from '../dist/src/lib/logger.js';
@@ -91,6 +90,7 @@ async function waitForCondition(
 
 /**
  * Cleanup all test resources
+ * Logs errors to help diagnose issues in CI, but continues cleanup
  */
 async function cleanup(registryPort?: string): Promise<void> {
   console.log('\n🧹 Cleaning up resources...\n');
@@ -100,24 +100,27 @@ async function cleanup(registryPort?: string): Promise<void> {
     execSync('kubectl delete deployment test-web-app --ignore-not-found=true', { stdio: 'pipe' });
     execSync('kubectl delete service test-web-app --ignore-not-found=true', { stdio: 'pipe' });
     console.log('   ✅ Kubernetes resources deleted');
-  } catch {
-    console.log('   ⚠️ Kubernetes cleanup (may not exist)');
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.log(`   ⚠️ Kubernetes cleanup failed: ${msg}`);
   }
   
   try {
     // Delete kind cluster
     execSync('kind delete cluster --name containerization-assist', { stdio: 'pipe' });
     console.log('   ✅ Kind cluster deleted');
-  } catch {
-    console.log('   ⚠️ Kind cluster cleanup (may not exist)');
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.log(`   ⚠️ Kind cluster cleanup failed: ${msg}`);
   }
   
   try {
     // Delete registry container
     execSync('docker rm -f ca-registry', { stdio: 'pipe' });
     console.log('   ✅ Registry container deleted');
-  } catch {
-    console.log('   ⚠️ Registry cleanup (may not exist)');
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.log(`   ⚠️ Registry cleanup failed: ${msg}`);
   }
   
   try {
@@ -127,8 +130,9 @@ async function cleanup(registryPort?: string): Promise<void> {
     }
     execSync('docker rmi -f test-health-app:local', { stdio: 'pipe' });
     console.log('   ✅ Test images deleted');
-  } catch {
-    console.log('   ⚠️ Image cleanup (may not exist)');
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.log(`   ⚠️ Image cleanup failed: ${msg}`);
   }
 }
 
